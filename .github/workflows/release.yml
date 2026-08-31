@@ -1,0 +1,70 @@
+name: Publish Windows release
+
+on:
+  push:
+    tags:
+      - "v1.0.1"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Publish Windows x64 executable
+        shell: pwsh
+        run: >-
+          dotnet publish src/DeepSeekPet/DeepSeekPet.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          -o dist/DeepSeekPet-win-x64
+
+      - name: Package release
+        shell: pwsh
+        run: |
+          $instructions = @"
+          DeepSeek 娘桌宠 $env:GITHUB_REF_NAME
+
+          1. 请先完整解压 ZIP，不要在压缩包内直接运行。
+          2. 双击 DeepSeekPet.exe。
+          3. 如果 Windows SmartScreen 提示风险，请点击“更多信息”→“仍要运行”。
+          4. 右键桌宠可打开设置或退出。
+
+          系统要求：Windows 10/11 x64。
+          "@
+          Set-Content -LiteralPath dist/DeepSeekPet-win-x64/使用说明.txt -Value $instructions -Encoding utf8
+          Compress-Archive -LiteralPath dist/DeepSeekPet-win-x64/DeepSeekPet.exe,dist/DeepSeekPet-win-x64/使用说明.txt -DestinationPath dist/DeepSeekPet-win-x64.zip -CompressionLevel Optimal
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = @"
+          Bug-fix release for smoother and safer desktop interaction.
+
+          ## Fixed
+          - Fixed high-DPI dragging where the pet moved farther than the mouse pointer
+          - Added continuous screen work-area constraints while dragging
+          - Improved multi-monitor handling, including displays with different DPI scales
+          - Made the default bottom position sit directly on the taskbar edge
+          - Corrected edge snapping against the current monitor's work area
+
+          The application is fully local and does not access accounts, balances, APIs, or the network.
+          "@
+          gh release create $env:GITHUB_REF_NAME dist/DeepSeekPet-win-x64.zip dist/DeepSeekPet-win-x64/DeepSeekPet.exe --verify-tag --latest --title "DeepSeek Girl Desktop Pet $env:GITHUB_REF_NAME" --notes $notes
