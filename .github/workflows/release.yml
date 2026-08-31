@@ -1,4 +1,4 @@
-name: Publish Windows release
+name: Publish v1.0.1 Windows release
 
 on:
   push:
