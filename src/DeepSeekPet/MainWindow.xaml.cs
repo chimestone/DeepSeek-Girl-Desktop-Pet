@@ -220,7 +220,10 @@ public partial class MainWindow : Window
     {
         _dragging = true;
         _dragMoved = false;
-        _dragStartScreen = PointToScreen(e.GetPosition(this));
+        // Window.Left/Top are measured in WPF device-independent pixels, while
+        // PointToScreen returns physical pixels. Mixing the two makes dragging
+        // faster than the pointer whenever Windows display scaling is above 100%.
+        _dragStartScreen = GetCursorPositionInDips();
         _dragStartWindow = new System.Windows.Point(Left, Top);
         _isWalking = false;
         CaptureMouse();
@@ -231,13 +234,14 @@ public partial class MainWindow : Window
     {
         if (!_dragging || e.LeftButton != MouseButtonState.Pressed) return;
 
-        var current = PointToScreen(e.GetPosition(this));
+        var current = GetCursorPositionInDips();
         var dx = current.X - _dragStartScreen.X;
         var dy = current.Y - _dragStartScreen.Y;
         if (Math.Abs(dx) + Math.Abs(dy) > 4) _dragMoved = true;
 
         Left = _dragStartWindow.X + dx;
         Top = _dragStartWindow.Y + dy;
+        ClampToVisibleWorkArea();
     }
 
     private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -284,9 +288,10 @@ public partial class MainWindow : Window
 
     private void ResetPosition(bool save = true)
     {
-        var work = SystemParameters.WorkArea;
+        var work = GetCurrentWorkArea();
         Left = work.Right - Width - 24;
-        Top = work.Bottom - Height - 8;
+        // Sit directly on the taskbar/work-area boundary by default.
+        Top = work.Bottom - Height;
         if (save) SavePosition();
     }
 
@@ -299,10 +304,35 @@ public partial class MainWindow : Window
 
     private Rect GetCurrentWorkArea()
     {
-        var center = new System.Windows.Point(Left + Math.Max(1, ActualWidth) / 2, Top + Math.Max(1, ActualHeight) / 2);
-        var screen = Forms.Screen.FromPoint(new System.Drawing.Point((int)center.X, (int)center.Y));
+        var deviceCenter = PointToScreen(new System.Windows.Point(
+            Math.Max(1, ActualWidth) / 2,
+            Math.Max(1, ActualHeight) / 2));
+        var screen = Forms.Screen.FromPoint(new System.Drawing.Point((int)deviceCenter.X, (int)deviceCenter.Y));
         var area = screen.WorkingArea;
-        return new Rect(area.Left, area.Top, area.Width, area.Height);
+        var topLeft = DeviceToDip(new System.Windows.Point(area.Left, area.Top));
+        var bottomRight = DeviceToDip(new System.Windows.Point(area.Right, area.Bottom));
+        return new Rect(topLeft, bottomRight);
+    }
+
+    private System.Windows.Point GetCursorPositionInDips()
+    {
+        var cursor = Forms.Cursor.Position;
+        return DeviceToDip(new System.Windows.Point(cursor.X, cursor.Y));
+    }
+
+    private System.Windows.Point DeviceToDip(System.Windows.Point point)
+    {
+        var source = PresentationSource.FromVisual(this);
+        if (source?.CompositionTarget is null) return point;
+
+        // Anchor the conversion to this window instead of scaling absolute
+        // desktop coordinates. This avoids jumps when monitors have different
+        // DPI scales or non-zero virtual-screen origins.
+        var deviceOrigin = PointToScreen(new System.Windows.Point(0, 0));
+        var dpi = VisualTreeHelper.GetDpi(this);
+        return new System.Windows.Point(
+            Left + (point.X - deviceOrigin.X) / dpi.DpiScaleX,
+            Top + (point.Y - deviceOrigin.Y) / dpi.DpiScaleY);
     }
 
     private void SavePosition()
