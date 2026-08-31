@@ -3,5 +3,6 @@
 .vs/
 dist/
 references/
+art/
 
 *.docx

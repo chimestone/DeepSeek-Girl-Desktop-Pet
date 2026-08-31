@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using Forms = System.Windows.Forms;
 
 namespace DeepSeekPet;
@@ -20,6 +22,8 @@ public partial class MainWindow : Window
     private bool _dragging;
     private bool _dragMoved;
     private readonly bool _qaVisible;
+    private readonly bool _qaSettings;
+    private string? _currentSkinId;
     private System.Windows.Point _dragStartScreen;
     private System.Windows.Point _dragStartWindow;
     private MenuItem? _walkMenuItem;
@@ -29,7 +33,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         // Makes the frameless window discoverable by automated UI checks without
         // changing normal desktop-pet behavior.
-        _qaVisible = Environment.GetCommandLineArgs().Contains("--qa-visible");
+        var arguments = Environment.GetCommandLineArgs();
+        _qaSettings = arguments.Contains("--qa-settings");
+        _qaVisible = _qaSettings || arguments.Contains("--qa-visible");
         if (_qaVisible)
         {
             ShowInTaskbar = true;
@@ -57,6 +63,10 @@ public partial class MainWindow : Window
         CompositionTarget.Rendering += OnRendering;
         _lastFrameSeconds = _clock.Elapsed.TotalSeconds;
         ScheduleNextBehavior(_lastFrameSeconds, startWalking: false);
+        if (_qaSettings)
+        {
+            Dispatcher.BeginInvoke(new Action(OpenSettings));
+        }
     }
 
     private void BuildContextMenu()
@@ -106,6 +116,7 @@ public partial class MainWindow : Window
         Height = _settings.PetSize * 1.04;
         Topmost = _settings.AlwaysOnTop;
         _walkMenuItem!.IsChecked = _settings.AutoWalk;
+        ApplySkin(animate: !initial);
 
         if (initial && _settings.Left is double left && _settings.Top is double top)
         {
@@ -121,6 +132,45 @@ public partial class MainWindow : Window
         {
             ClampToVisibleWorkArea();
         }
+    }
+
+    private void ApplySkin(bool animate)
+    {
+        var skin = SkinCatalog.Find(_settings.SkinId);
+        _settings.SkinId = skin.Id;
+        Title = $"{skin.DisplayName}桌宠";
+
+        if (_currentSkinId == skin.Id && PetImage.Source is not null) return;
+
+        var nextSource = new BitmapImage(skin.ResourceUri);
+        _currentSkinId = skin.Id;
+
+        if (!animate || PetImage.Source is null)
+        {
+            PetImage.Source = nextSource;
+            PetImage.Opacity = 1;
+            PetImageIncoming.Source = null;
+            PetImageIncoming.Opacity = 0;
+            return;
+        }
+
+        PetImageIncoming.Source = nextSource;
+        PetImageIncoming.Opacity = 0;
+        var duration = new Duration(TimeSpan.FromMilliseconds(160));
+        var fadeOut = new DoubleAnimation(1, 0, duration);
+        var fadeIn = new DoubleAnimation(0, 1, duration);
+        fadeIn.Completed += (_, _) =>
+        {
+            PetImage.BeginAnimation(OpacityProperty, null);
+            PetImageIncoming.BeginAnimation(OpacityProperty, null);
+            PetImage.Source = nextSource;
+            PetImage.Opacity = 1;
+            PetImageIncoming.Source = null;
+            PetImageIncoming.Opacity = 0;
+        };
+
+        PetImage.BeginAnimation(OpacityProperty, fadeOut, HandoffBehavior.SnapshotAndReplace);
+        PetImageIncoming.BeginAnimation(OpacityProperty, fadeIn, HandoffBehavior.SnapshotAndReplace);
     }
 
     private void OnRendering(object? sender, EventArgs e)

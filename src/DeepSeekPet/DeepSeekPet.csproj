@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\deepseek-girl.png" />
+    <Resource Include="Assets\Skins\*.png" />
     <Content Include="Assets\deepseek-girl.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

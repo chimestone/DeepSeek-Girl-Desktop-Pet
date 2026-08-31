@@ -10,6 +10,8 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         Result = settings;
+        SkinList.ItemsSource = SkinCatalog.All;
+        SkinList.SelectedValue = SkinCatalog.Find(settings.SkinId).Id;
         AutoWalkCheck.IsChecked = settings.AutoWalk;
         SpeedSlider.Value = settings.WalkSpeed;
         SizeSlider.Value = settings.PetSize;
@@ -30,6 +32,7 @@ public partial class SettingsWindow : Window
 
     private void SaveClicked(object sender, RoutedEventArgs e)
     {
+        Result.SkinId = SkinList.SelectedValue as string ?? SkinCatalog.DefaultId;
         Result.AutoWalk = AutoWalkCheck.IsChecked == true;
         Result.WalkSpeed = SpeedSlider.Value;
         Result.PetSize = SizeSlider.Value;

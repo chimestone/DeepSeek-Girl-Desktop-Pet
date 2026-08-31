@@ -11,6 +11,7 @@ public sealed class PetSettings
     public bool AlwaysOnTop { get; set; } = true;
     public bool EdgeSnap { get; set; } = true;
     public bool StartWithWindows { get; set; }
+    public string SkinId { get; set; } = SkinCatalog.DefaultId;
     public double? Left { get; set; }
     public double? Top { get; set; }
 
@@ -55,6 +56,7 @@ public sealed class PetSettings
         AlwaysOnTop = AlwaysOnTop,
         EdgeSnap = EdgeSnap,
         StartWithWindows = StartWithWindows,
+        SkinId = SkinId,
         Left = Left,
         Top = Top
     };

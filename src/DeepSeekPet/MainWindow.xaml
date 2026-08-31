@@ -11,20 +11,27 @@
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
     <Grid x:Name="Root" Background="#01FFFFFF">
-        <Image x:Name="PetImage"
-               Source="Assets/deepseek-girl.png"
-               Stretch="Uniform"
-               HorizontalAlignment="Stretch"
-               VerticalAlignment="Stretch"
-               RenderOptions.BitmapScalingMode="HighQuality"
-               RenderTransformOrigin="0.5,1">
-            <Image.RenderTransform>
+        <Grid x:Name="PetVisual" RenderTransformOrigin="0.5,1">
+            <Grid.RenderTransform>
                 <TransformGroup>
                     <ScaleTransform x:Name="PetScale" ScaleX="1" ScaleY="1" />
                     <RotateTransform x:Name="PetRotate" Angle="0" />
                     <TranslateTransform x:Name="PetTranslate" X="0" Y="0" />
                 </TransformGroup>
-            </Image.RenderTransform>
-        </Image>
+            </Grid.RenderTransform>
+            <Image x:Name="PetImage"
+                   Source="Assets/Skins/deepseek-girl.png"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Stretch"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
+            <Image x:Name="PetImageIncoming"
+                   Opacity="0"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Stretch"
+                   IsHitTestVisible="False"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
+        </Grid>
     </Grid>
 </Window>
