@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 
 namespace DeepSeekPet;
@@ -23,10 +24,15 @@ public partial class MainWindow : Window
     private bool _dragMoved;
     private readonly bool _qaVisible;
     private readonly bool _qaSettings;
+    private readonly bool _qaAssistant;
     private string? _currentSkinId;
     private System.Windows.Point _dragStartScreen;
     private System.Windows.Point _dragStartWindow;
     private MenuItem? _walkMenuItem;
+    private AssistantWindow? _assistantWindow;
+    private readonly DispatcherTimer _assistantHideTimer = new();
+    private int _assistantAnimationGeneration;
+    private bool _assistantAutoDismiss;
 
     public MainWindow()
     {
@@ -35,15 +41,29 @@ public partial class MainWindow : Window
         // changing normal desktop-pet behavior.
         var arguments = Environment.GetCommandLineArgs();
         _qaSettings = arguments.Contains("--qa-settings");
-        _qaVisible = _qaSettings || arguments.Contains("--qa-visible");
+        _qaAssistant = arguments.Contains("--qa-assistant");
+        _qaVisible = _qaSettings || _qaAssistant || arguments.Contains("--qa-visible");
         if (_qaVisible)
         {
             ShowInTaskbar = true;
         }
         BuildContextMenu();
 
+        _assistantHideTimer.Tick += (_, _) =>
+        {
+            _assistantHideTimer.Stop();
+            if (!(_assistantWindow?.IsMouseOver ?? false))
+                HideAssistant();
+        };
+
         Loaded += OnLoaded;
-        Closed += (_, _) => CompositionTarget.Rendering -= OnRendering;
+        LocationChanged += (_, _) => PositionAssistant();
+        SizeChanged += (_, _) => PositionAssistant();
+        Closed += (_, _) =>
+        {
+            CompositionTarget.Rendering -= OnRendering;
+            _assistantWindow?.CloseForAppExit();
+        };
         MouseLeftButtonDown += OnMouseLeftButtonDown;
         MouseMove += OnMouseMove;
         MouseLeftButtonUp += OnMouseLeftButtonUp;
@@ -56,6 +76,7 @@ public partial class MainWindow : Window
         if (_qaVisible)
         {
             _settings.AutoWalk = false;
+            Topmost = true;
             var work = SystemParameters.WorkArea;
             Left = work.Left + (work.Width - Width) / 2;
             Top = work.Top + (work.Height - Height) / 2;
@@ -67,11 +88,18 @@ public partial class MainWindow : Window
         {
             Dispatcher.BeginInvoke(new Action(OpenSettings));
         }
+        else if (_qaAssistant)
+        {
+            Dispatcher.BeginInvoke(new Action(OpenAssistant));
+        }
     }
 
     private void BuildContextMenu()
     {
         var menu = new ContextMenu();
+        var assistantItem = new MenuItem { Header = "显示/隐藏小助手" };
+        assistantItem.Click += (_, _) => ToggleAssistant();
+
         var settingsItem = new MenuItem { Header = "设置…" };
         settingsItem.Click += (_, _) => OpenSettings();
 
@@ -89,6 +117,7 @@ public partial class MainWindow : Window
         var exitItem = new MenuItem { Header = "退出" };
         exitItem.Click += (_, _) => Close();
 
+        menu.Items.Add(assistantItem);
         menu.Items.Add(settingsItem);
         menu.Items.Add(_walkMenuItem);
         menu.Items.Add(resetItem);
@@ -96,6 +125,121 @@ public partial class MainWindow : Window
         menu.Items.Add(exitItem);
         menu.Opened += (_, _) => _walkMenuItem.IsChecked = _settings.AutoWalk;
         Root.ContextMenu = menu;
+    }
+
+    private void EnsureAssistant()
+    {
+        if (_assistantWindow is not null) return;
+
+        _assistantWindow = new AssistantWindow { Owner = this, Topmost = _settings.AlwaysOnTop };
+        _assistantWindow.ApplyScale(_settings.PetSize);
+        if (_qaAssistant)
+        {
+            _assistantWindow.ShowInTaskbar = true;
+            _assistantWindow.ShowActivated = true;
+            _assistantWindow.Topmost = true;
+        }
+        _assistantWindow.MouseEnter += (_, _) => _assistantHideTimer.Stop();
+        _assistantWindow.MouseLeave += (_, _) =>
+        {
+            if (_assistantAutoDismiss) ScheduleAssistantHide(TimeSpan.FromSeconds(2));
+        };
+        _assistantWindow.HideRequested += (_, _) => HideAssistant(immediate: true);
+        _assistantWindow.AttentionRequested += (_, _) =>
+        {
+            ShowAssistant(manualOpen: false);
+            _assistantAutoDismiss = true;
+            ScheduleAssistantHide(TimeSpan.FromSeconds(8));
+        };
+    }
+
+    private void OpenAssistant() => ShowAssistant();
+
+    private void ToggleAssistant()
+    {
+        EnsureAssistant();
+        if (_assistantWindow!.IsVisible) HideAssistant(immediate: true);
+        else ShowAssistant();
+    }
+
+    private void ShowAssistant(bool manualOpen = true)
+    {
+        EnsureAssistant();
+        _assistantHideTimer.Stop();
+        _assistantAutoDismiss = !manualOpen;
+        if (manualOpen) _assistantWindow!.PrepareManualOpen();
+        PositionAssistant();
+
+        var generation = ++_assistantAnimationGeneration;
+        if (!_assistantWindow!.IsVisible)
+        {
+            _assistantWindow.Opacity = 0;
+            _assistantWindow.Show();
+        }
+
+        var fadeIn = new DoubleAnimation(_assistantWindow.Opacity, 1, TimeSpan.FromMilliseconds(140));
+        fadeIn.Completed += (_, _) =>
+        {
+            if (generation == _assistantAnimationGeneration) _assistantWindow.Opacity = 1;
+        };
+        _assistantWindow.BeginAnimation(OpacityProperty, fadeIn, HandoffBehavior.SnapshotAndReplace);
+    }
+
+    private void ScheduleAssistantHide(TimeSpan delay)
+    {
+        if (_qaAssistant) return;
+        _assistantHideTimer.Stop();
+        _assistantHideTimer.Interval = delay;
+        _assistantHideTimer.Start();
+    }
+
+    private void HideAssistant(bool immediate = false)
+    {
+        if (_qaAssistant && !immediate) return;
+        _assistantHideTimer.Stop();
+        if (_assistantWindow is not { IsVisible: true }) return;
+
+        var generation = ++_assistantAnimationGeneration;
+        if (immediate)
+        {
+            _assistantWindow.Hide();
+            _assistantWindow.Opacity = 1;
+            _assistantWindow.ClearNotice();
+            _assistantAutoDismiss = false;
+            return;
+        }
+
+        var fadeOut = new DoubleAnimation(_assistantWindow.Opacity, 0, TimeSpan.FromMilliseconds(120));
+        fadeOut.Completed += (_, _) =>
+        {
+            if (generation != _assistantAnimationGeneration || _assistantWindow.IsMouseOver) return;
+            _assistantWindow.Hide();
+            _assistantWindow.Opacity = 1;
+            _assistantWindow.ClearNotice();
+            _assistantAutoDismiss = false;
+        };
+        _assistantWindow.BeginAnimation(OpacityProperty, fadeOut, HandoffBehavior.SnapshotAndReplace);
+    }
+
+    private void PositionAssistant()
+    {
+        if (_assistantWindow is null) return;
+
+        var work = GetCurrentWorkArea();
+        var bubbleWidth = _assistantWindow.Width;
+        var bubbleHeight = _assistantWindow.Height;
+        const double overlap = 8;
+        var fitsRight = Left + ActualWidth + bubbleWidth - overlap <= work.Right;
+        var fitsLeft = Left - bubbleWidth + overlap >= work.Left;
+        var bubbleOnRight = fitsRight || !fitsLeft;
+
+        var targetLeft = bubbleOnRight
+            ? Left + ActualWidth - overlap
+            : Left - bubbleWidth + overlap;
+        var targetTop = Top + ActualHeight / 2 - bubbleHeight / 2;
+        _assistantWindow.Left = Math.Clamp(targetLeft, work.Left, Math.Max(work.Left, work.Right - bubbleWidth));
+        _assistantWindow.Top = Math.Clamp(targetTop, work.Top, Math.Max(work.Top, work.Bottom - bubbleHeight));
+        _assistantWindow.PointTailTowardPet(bubbleOnRight);
     }
 
     private void OpenSettings()
@@ -115,6 +259,11 @@ public partial class MainWindow : Window
         Width = _settings.PetSize;
         Height = _settings.PetSize * 1.04;
         Topmost = _settings.AlwaysOnTop;
+        if (_assistantWindow is not null)
+        {
+            _assistantWindow.Topmost = _settings.AlwaysOnTop;
+            _assistantWindow.ApplyScale(_settings.PetSize);
+        }
         _walkMenuItem!.IsChecked = _settings.AutoWalk;
         ApplySkin(animate: !initial);
 
@@ -268,6 +417,18 @@ public partial class MainWindow : Window
 
     private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (e.ClickCount >= 2)
+        {
+            if (_dragging)
+            {
+                _dragging = false;
+                ReleaseMouseCapture();
+            }
+            ToggleAssistant();
+            e.Handled = true;
+            return;
+        }
+
         _dragging = true;
         _dragMoved = false;
         // Window.Left/Top are measured in WPF device-independent pixels, while
@@ -287,7 +448,11 @@ public partial class MainWindow : Window
         var current = GetCursorPositionInDips();
         var dx = current.X - _dragStartScreen.X;
         var dy = current.Y - _dragStartScreen.Y;
-        if (Math.Abs(dx) + Math.Abs(dy) > 4) _dragMoved = true;
+        if (Math.Abs(dx) + Math.Abs(dy) > 4 && !_dragMoved)
+        {
+            _dragMoved = true;
+            HideAssistant(immediate: true);
+        }
 
         Left = _dragStartWindow.X + dx;
         Top = _dragStartWindow.Y + dy;
