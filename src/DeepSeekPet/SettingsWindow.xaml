@@ -36,7 +36,7 @@
             </Setter>
         </Style>
     </Window.Resources>
-    <Grid Margin="22">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"><Grid Margin="22">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -104,12 +104,20 @@
             <CheckBox x:Name="StartupCheck" Content="登录 Windows 后自动启动" />
         </StackPanel>
 
-        <TextBlock Grid.Row="9" Margin="0,18,0,0" Foreground="#666" TextWrapping="Wrap"
-                   Text="选择角色后保存即可平滑切换。左键拖动桌宠，单击会有 Q 弹回应；右键可随时打开设置或退出。" />
+        <StackPanel Grid.Row="9" Margin="0,18,0,14">
+            <TextBlock Text="大模型对话" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
+            <TextBlock Text="模型名称"/>
+            <TextBox x:Name="ApiModel" Padding="5" Margin="0,4,0,8"/>
+            <TextBlock Text="API Key（留空保留已保存的 Key）"/>
+            <PasswordBox x:Name="ApiKey" Padding="5" Margin="0,4,0,4"/>
+            <CheckBox x:Name="RemoveApiKey" Content="移除已保存的 Key" Margin="0,4,0,4"/>
+            <TextBlock x:Name="ApiStatus" Foreground="#666" FontSize="11" TextWrapping="Wrap"/>
+            <TextBlock Text="Key 由 Windows 当前用户加密保存。普通对话将问题与近期上下文提交至 DeepSeek；本地待办与计时不依赖 API。" Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
+        </StackPanel>
 
         <StackPanel Grid.Row="10" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="取消" Width="80" Margin="0,0,10,0" IsCancel="True" />
             <Button Content="保存" Width="88" IsDefault="True" Click="SaveClicked" />
         </StackPanel>
-    </Grid>
+    </Grid></ScrollViewer>
 </Window>

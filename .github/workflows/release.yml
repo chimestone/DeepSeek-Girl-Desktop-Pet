@@ -1,0 +1,55 @@
+name: Publish Windows release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Validate version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content src/DeepSeekPet/DeepSeekPet.csproj
+          if ($project.Project.PropertyGroup.Version -ne $env:RELEASE_TAG.Substring(1)) {
+            throw 'Project version must match the release tag.'
+          }
+      - name: Run local checks
+        shell: pwsh
+        run: |
+          dotnet run --project tests/DeepSeekPet.ChatChecks -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish standalone Windows app
+        shell: pwsh
+        run: |
+          dotnet publish src/DeepSeekPet/DeepSeekPet.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o "dist/DeepSeekPet-win-x64-$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item README.md,LICENSE "dist/DeepSeekPet-win-x64-$env:RELEASE_TAG"
+          Compress-Archive -Path "dist/DeepSeekPet-win-x64-$env:RELEASE_TAG" -DestinationPath "dist/DeepSeekPet-win-x64-$env:RELEASE_TAG.zip"
+          (Get-FileHash "dist/DeepSeekPet-win-x64-$env:RELEASE_TAG.zip" -Algorithm SHA256).Hash.ToLowerInvariant() + "  DeepSeekPet-win-x64-$env:RELEASE_TAG.zip" | Set-Content "dist/DeepSeekPet-win-x64-$env:RELEASE_TAG.zip.sha256" -Encoding ascii
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $notes = "docs/releases/$env:RELEASE_TAG.md"
+          if (Test-Path $notes) {
+            gh release create $env:RELEASE_TAG "dist/DeepSeekPet-win-x64-$env:RELEASE_TAG.zip" "dist/DeepSeekPet-win-x64-$env:RELEASE_TAG.zip.sha256" --verify-tag --title "偶鲸鲸 $env:RELEASE_TAG" --notes-file $notes
+          } else {
+            gh release create $env:RELEASE_TAG "dist/DeepSeekPet-win-x64-$env:RELEASE_TAG.zip" "dist/DeepSeekPet-win-x64-$env:RELEASE_TAG.zip.sha256" --verify-tag --title "偶鲸鲸 $env:RELEASE_TAG" --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

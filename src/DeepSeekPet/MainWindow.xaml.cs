@@ -108,7 +108,7 @@ public partial class MainWindow : Window
         {
             _settings.AutoWalk = _walkMenuItem.IsChecked;
             _settings.Save();
-            if (!_settings.AutoWalk) _isWalking = false;
+            if (!_settings.AutoWalk || (_assistantWindow?.IsVisible ?? false)) _isWalking = false;
         };
 
         var resetItem = new MenuItem { Header = "回到屏幕右下角" };
@@ -144,12 +144,14 @@ public partial class MainWindow : Window
         {
             if (_assistantAutoDismiss) ScheduleAssistantHide(TimeSpan.FromSeconds(2));
         };
+        _assistantWindow.LayoutRequested += (_, _) => PositionAssistant();
+        _assistantWindow.SettingsRequested += (_, _) => OpenSettings();
+        _assistantWindow.MoveRequested += (dx, dy) => { Left += dx; Top += dy; ClampToVisibleWorkArea(); PositionAssistant(); SavePosition(); };
         _assistantWindow.HideRequested += (_, _) => HideAssistant(immediate: true);
         _assistantWindow.AttentionRequested += (_, _) =>
         {
             ShowAssistant(manualOpen: false);
-            _assistantAutoDismiss = true;
-            ScheduleAssistantHide(TimeSpan.FromSeconds(8));
+            _assistantAutoDismiss = false;
         };
     }
 
@@ -166,8 +168,9 @@ public partial class MainWindow : Window
     {
         EnsureAssistant();
         _assistantHideTimer.Stop();
-        _assistantAutoDismiss = !manualOpen;
+        _assistantAutoDismiss = false;
         if (manualOpen) _assistantWindow!.PrepareManualOpen();
+        _isWalking = false;
         PositionAssistant();
 
         var generation = ++_assistantAnimationGeneration;
@@ -225,23 +228,9 @@ public partial class MainWindow : Window
     {
         if (_assistantWindow is null) return;
 
-        var work = GetCurrentWorkArea();
-        var bubbleWidth = _assistantWindow.Width;
-        var bubbleHeight = _assistantWindow.Height;
-        const double overlap = 8;
-        var fitsRight = Left + ActualWidth + bubbleWidth - overlap <= work.Right;
-        var fitsLeft = Left - bubbleWidth + overlap >= work.Left;
-        var bubbleOnRight = fitsRight || !fitsLeft;
-
-        var targetLeft = bubbleOnRight
-            ? Left + ActualWidth - overlap
-            : Left - bubbleWidth + overlap;
-        var targetTop = Top + ActualHeight / 2 - bubbleHeight / 2;
-        _assistantWindow.Left = Math.Clamp(targetLeft, work.Left, Math.Max(work.Left, work.Right - bubbleWidth));
-        _assistantWindow.Top = Math.Clamp(targetTop, work.Top, Math.Max(work.Top, work.Bottom - bubbleHeight));
-        _assistantWindow.PointTailTowardPet(bubbleOnRight);
+        _assistantWindow.Left = Left;
+        _assistantWindow.Top = Top + Height - _assistantWindow.Height;
     }
-
     private void OpenSettings()
     {
         var dialog = new SettingsWindow(_settings.Clone()) { Owner = this };
@@ -263,6 +252,7 @@ public partial class MainWindow : Window
         {
             _assistantWindow.Topmost = _settings.AlwaysOnTop;
             _assistantWindow.ApplyScale(_settings.PetSize);
+            PositionAssistant();
         }
         _walkMenuItem!.IsChecked = _settings.AutoWalk;
         ApplySkin(animate: !initial);
@@ -338,7 +328,7 @@ public partial class MainWindow : Window
 
     private void UpdateBehavior(double now, double dt)
     {
-        if (!_settings.AutoWalk)
+        if (!_settings.AutoWalk || (_assistantWindow?.IsVisible ?? false))
         {
             _isWalking = false;
             return;
@@ -451,7 +441,6 @@ public partial class MainWindow : Window
         if (Math.Abs(dx) + Math.Abs(dy) > 4 && !_dragMoved)
         {
             _dragMoved = true;
-            HideAssistant(immediate: true);
         }
 
         Left = _dragStartWindow.X + dx;
