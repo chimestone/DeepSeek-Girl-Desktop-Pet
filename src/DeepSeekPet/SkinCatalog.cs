@@ -17,7 +17,8 @@ public static class SkinCatalog
         new("gugugaga", "咕咕嘎嘎", "Assets/Skins/gugugaga.png"),
         new("phoebe", "菲比", "Assets/Skins/phoebe.png"),
         new("chen-qianyu", "啥子龙", "Assets/Skins/chen-qianyu.png"),
-        new("mutsumi", "睦子米", "Assets/Skins/mutsumi.png")
+        new("mutsumi", "睦子米", "Assets/Skins/mutsumi.png"),
+        new("claude-girl", "Claude 娘", "Assets/Skins/claude-girl.png")
     ];
 
     public static SkinOption Find(string? id) =>
