@@ -7,6 +7,7 @@ namespace DeepSeekPet;
 public partial class AssistantWindow
 {
     private readonly DeepSeekChatSession _chatSession = new();
+    private readonly RpgDialogueHistory _dialogue = new();
     private CancellationTokenSource? _chatCancellation;
     private int _conversationGeneration;
     private static readonly HttpClient WeatherHttp = new() { Timeout = TimeSpan.FromSeconds(15) };
@@ -18,7 +19,8 @@ public partial class AssistantWindow
             ++_conversationGeneration;
             _chatCancellation?.Cancel();
             _chatSession.Clear();
-            ChatOutput.Clear();
+            _dialogue.Clear();
+            RenderDialogue();
             ChatInput.Clear();
             SetExpanded(false);
         };
@@ -35,8 +37,9 @@ public partial class AssistantWindow
         ChatSend.Visibility = Visibility.Collapsed;
         ChatCancel.Visibility = Visibility.Visible;
         ChatInput.IsEnabled = false;
-        ChatOutput.AppendText($"\n你：{prompt}\n鲸鲸：");
-        ChatStatus.Text = "处理中…";
+        var reply = _dialogue.BeginTurn(prompt);
+        RenderDialogue();
+        ChatStatus.Text = string.Empty;
         var completed = false;
         try
         {
@@ -44,7 +47,7 @@ public partial class AssistantWindow
             if (command != null)
             {
                 var result = await ExecuteCommandAsync(command, cancellation.Token);
-                if (generation == _conversationGeneration) ChatOutput.AppendText(result);
+                if (generation == _conversationGeneration) { _dialogue.Append(reply, result); RenderDialogue(); }
             }
             else
             {
@@ -52,14 +55,13 @@ public partial class AssistantWindow
                 await _chatSession.SendAsync(config.ReadKey(), config.Model, prompt, chunk =>
                 {
                     if (generation != _conversationGeneration) return;
-                    ChatStatus.Text = "正在回复…";
-                    ChatOutput.AppendText(chunk);
-                    ChatOutput.ScrollToEnd();
+                    _dialogue.Append(reply, chunk);
+                    RenderDialogue();
                 }, cancellation.Token);
             }
             if (generation == _conversationGeneration) ChatInput.Clear();
             completed = true;
-            ChatStatus.Text = "完成";
+            ChatStatus.Text = string.Empty;
         }
         catch (OperationCanceledException) { ChatStatus.Text = "已取消或超时，可重新发送"; }
         catch (HttpRequestException) { ChatStatus.Text = "网络连接失败，可重新发送"; }
@@ -68,7 +70,10 @@ public partial class AssistantWindow
         finally
         {
             if (generation == _conversationGeneration)
-                ChatOutput.AppendText(completed ? "\n" : $"\n[未完成：{ChatStatus.Text}]\n");
+            {
+                if (!completed) _dialogue.Append(reply, $"\n[未完成：{ChatStatus.Text}]");
+                RenderDialogue();
+            }
             _chatCancellation = null;
             ChatSend.Visibility = Visibility.Visible;
             ChatCancel.Visibility = Visibility.Collapsed;
@@ -77,13 +82,21 @@ public partial class AssistantWindow
             if (completed) UpdateTimerStatus();
         }
     }
+    private void RenderDialogue(bool scrollToStart = false)
+    {
+        var text = IsExpanded ? _dialogue.HistoryText : _dialogue.CompactText;
+        if (ChatOutput.Text != text) ChatOutput.Text = text;
+        if (scrollToStart) ChatOutput.ScrollToHome();
+        else ChatOutput.ScrollToEnd();
+    }
     private void CancelChat_Click(object sender, RoutedEventArgs e) => _chatCancellation?.Cancel();
     private void ClearChat_Click(object sender, RoutedEventArgs e)
     {
         ++_conversationGeneration;
         _chatCancellation?.Cancel();
         _chatSession.Clear();
-        ChatOutput.Clear();
+        _dialogue.Clear();
+        RenderDialogue();
         ClearNotice();
         UpdateTimerStatus();
     }

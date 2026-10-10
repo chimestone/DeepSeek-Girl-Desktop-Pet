@@ -25,6 +25,17 @@ static class UiChecks
 
         var pet = new MainWindow();
         var bubble = new AssistantWindow();
+        var display = (RpgDialogueHistory)Get(bubble, "_dialogue")!;
+        display.AddReply("上一条回复");
+        var turn = display.BeginTurn("我想开始专注");
+        display.Append(turn, "好呀，准备好后，我们就开始吧。");
+        Invoke(bubble, "RenderDialogue", false);
+        var outputText = (TextBox)bubble.FindName("ChatOutput");
+        Check(outputText.Text == "好呀，准备好后，我们就开始吧。", "compact only assistant reply");
+        bubble.SetExpanded(true);
+        Check(outputText.Text.Contains("你：我想开始专注") && outputText.Text.Contains("上一条回复"), "expanded renders full history");
+        bubble.SetExpanded(false);
+        Check(!outputText.Text.Contains("我想开始专注") && !outputText.Text.Contains("上一条回复"), "collapse hides history");
         Set(pet, "_assistantWindow", bubble);
         bubble.LayoutRequested += (_, _) => Invoke(pet, "PositionAssistant");
         foreach (var size in new[] { 150d, 250d, 420d })
@@ -71,6 +82,28 @@ static class UiChecks
         Check(notified && bubble.IsVisible && !bubble.IsExpanded && Get(bubble, "_deadline") == null, "timer wakes compact bubble");
         var settings = new SettingsWindow(new PetSettings());
         Check(settings.FindName("ApiModel") != null && settings.FindName("ApiKey") != null, "settings API controls");
+        var settingsRoot = (FrameworkElement)settings.Content;
+        settingsRoot.Measure(new Size(560, 620));
+        settingsRoot.Arrange(new Rect(0, 0, 560, 620));
+        settingsRoot.UpdateLayout();
+        var saveButton = (Button)settings.FindName("SaveSettingsButton");
+        var scroll = (ScrollViewer)settings.FindName("SettingsScroll");
+        var positionBefore = saveButton.TranslatePoint(new Point(0, 0), settingsRoot);
+        scroll.ScrollToEnd();
+        settingsRoot.UpdateLayout();
+        var positionAfter = saveButton.TranslatePoint(new Point(0, 0), settingsRoot);
+        Check(positionBefore == positionAfter && positionAfter.Y + saveButton.ActualHeight <= 620, "save stays visible when scrolling");
+        bubble.ApplyCharacter("菲比");
+        Check(((TextBlock)bubble.FindName("HeaderTitle")).Text == "菲比", "skin name applied");
+        bubble.ClearNotice();
+        Check(((TextBlock)bubble.FindName("HeaderTitle")).Text == "菲比", "clear notice retains name");
+        display.AddReply("新的角色回复");
+        bubble.SetExpanded(true);
+        Check(outputText.Text.Contains("菲比：新的角色回复"), "history uses skin name");
+        Set(bubble, "_deadline", DateTimeOffset.UtcNow.AddSeconds(-1));
+        Invoke(bubble, "Timer_Tick", null, EventArgs.Empty);
+        Check(((TextBlock)bubble.FindName("HeaderTitle")).Text == "菲比", "reminder retains skin name");
+        Console.WriteLine("PASS: skin name in title/history/reminder and fixed settings footer.");
         settings.Close();
         bubble.CloseForAppExit();
         pet.Close();

@@ -30,7 +30,7 @@
                 <Button DockPanel.Dock="Right" Content="×" Click="HideButton_Click" ToolTip="收起对话，计时继续"/>
                 <Button DockPanel.Dock="Right" Content="⚙" Click="SettingsButton_Click" ToolTip="设置 API 与桌宠"/>
                 <Button DockPanel.Dock="Right" Content="＋" Click="ClearChat_Click" ToolTip="新会话"/>
-                <TextBlock x:Name="HeaderTitle" Text="偶鲸鲸" FontSize="11" Foreground="#334155" VerticalAlignment="Center"/>
+                <TextBlock x:Name="HeaderTitle" Text="偶鲸鲸" TextTrimming="CharacterEllipsis" FontSize="11" Foreground="#334155" VerticalAlignment="Center"/>
             </DockPanel>
             <Border x:Name="NoticeBorder" Grid.Row="1" Background="#DAFFF0BD" CornerRadius="5" Padding="4" Visibility="Collapsed">
                 <TextBlock x:Name="NoticeText" FontSize="11" Foreground="#614517" TextWrapping="Wrap"/>
@@ -45,7 +45,7 @@
                 <TextBox x:Name="ChatInput" MinHeight="25" MaxHeight="45" TextWrapping="Wrap" AcceptsReturn="True"
                          MaxLength="8000" VerticalScrollBarVisibility="Auto" KeyDown="ChatInput_KeyDown"
                          Background="#BFFFFFFF" BorderBrush="#7094A3B8" Padding="3" FontSize="12"
-                         ToolTip="Enter 发送，Shift+Enter 换行；输入 帮助 查看本地能力"/>
+                         />
                 <Button x:Name="ChatSend" Grid.Column="1" Content="↑" FontSize="17" Click="SendChat_Click" ToolTip="发送"/>
                 <Button x:Name="ChatCancel" Grid.Column="1" Content="■" Click="CancelChat_Click" Visibility="Collapsed" ToolTip="停止回复"/>
                 <Button x:Name="ExpandButton" Grid.Column="2" Content="⤢" FontSize="17" Click="Expand_Click" ToolTip="展开至桌宠全身范围"/>

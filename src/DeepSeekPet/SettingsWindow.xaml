@@ -36,7 +36,9 @@
             </Setter>
         </Style>
     </Window.Resources>
-    <ScrollViewer VerticalScrollBarVisibility="Auto"><Grid Margin="22">
+    <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <ScrollViewer x:Name="SettingsScroll" Grid.Row="0" VerticalScrollBarVisibility="Auto"><Grid Margin="22,22,22,10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -115,9 +117,12 @@
             <TextBlock Text="Key 由 Windows 当前用户加密保存。普通对话将问题与近期上下文提交至 DeepSeek；本地待办与计时不依赖 API。" Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="10" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="取消" Width="80" Margin="0,0,10,0" IsCancel="True" />
-            <Button Content="保存" Width="88" IsDefault="True" Click="SaveClicked" />
-        </StackPanel>
-    </Grid></ScrollViewer>
+        </Grid></ScrollViewer>
+        <Border Grid.Row="1" Background="#F7F8FA" BorderBrush="#D9DDE5" BorderThickness="0,1,0,0" Padding="22,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="CancelSettingsButton" Content="取消" Width="80" Height="30" Margin="0,0,10,0" IsCancel="True"/>
+                <Button x:Name="SaveSettingsButton" Content="保存" Width="88" Height="30" IsDefault="True" Click="SaveClicked"/>
+            </StackPanel>
+        </Border>
+    </Grid>
 </Window>

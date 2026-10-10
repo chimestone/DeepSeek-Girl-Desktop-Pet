@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>DeepSeekPet</AssemblyName>
-    <Version>1.3.0</Version>
+    <Version>1.3.1</Version>
     <RootNamespace>DeepSeekPet</RootNamespace>
     <ApplicationIcon>Assets\deepseek-girl.ico</ApplicationIcon>
   </PropertyGroup>

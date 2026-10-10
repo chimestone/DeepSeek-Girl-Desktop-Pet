@@ -133,6 +133,7 @@ public partial class MainWindow : Window
 
         _assistantWindow = new AssistantWindow { Owner = this, Topmost = _settings.AlwaysOnTop };
         _assistantWindow.ApplyScale(_settings.PetSize);
+        _assistantWindow.ApplyCharacter(SkinCatalog.Find(_settings.SkinId).DisplayName);
         if (_qaAssistant)
         {
             _assistantWindow.ShowInTaskbar = true;
@@ -278,6 +279,7 @@ public partial class MainWindow : Window
         var skin = SkinCatalog.Find(_settings.SkinId);
         _settings.SkinId = skin.Id;
         Title = $"{skin.DisplayName}桌宠";
+        _assistantWindow?.ApplyCharacter(skin.DisplayName);
 
         if (_currentSkinId == skin.Id && PetImage.Source is not null) return;
 

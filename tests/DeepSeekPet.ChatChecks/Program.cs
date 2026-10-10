@@ -40,6 +40,23 @@ Check(AssistantCommands.Parse("暂停计时")?.Name == "pause", "pause command")
 Check(AssistantCommands.Parse("添加待办 买牛奶") == new AssistantCommand("add-todo", "买牛奶"), "todo add");
 Check(AssistantCommands.Parse("完成待办1") == new AssistantCommand("complete-todo", Number: 1), "todo complete");
 Check(AssistantCommands.Parse("你好") == null, "ordinary chat fallback");
+var dialogue = new RpgDialogueHistory();
+dialogue.AddReply("上一条回复");
+var pendingReply = dialogue.BeginTurn("不应在紧凑模式显示的问题");
+Check(dialogue.CompactText == "上一条回复", "waiting retains previous reply");
+Check(dialogue.HistoryText.Contains("不应在紧凑模式显示的问题"), "expanded includes user message");
+dialogue.Append(pendingReply, "新的");
+Check(dialogue.CompactText == "新的", "first chunk replaces previous reply");
+dialogue.Append(pendingReply, "回复");
+Check(dialogue.CompactText == "新的回复", "stream accumulates latest reply");
+dialogue.AddReply("计时到点");
+dialogue.Append(pendingReply, "继续");
+Check(dialogue.CompactText == "计时到点", "reminder stays visible during previous stream");
+Check(dialogue.HistoryText.Contains("上一条回复") && dialogue.HistoryText.Contains("新的回复继续"), "expanded preserves history");
+dialogue.Clear();
+dialogue.Append(pendingReply, "过期回复");
+Check(dialogue.CompactText == "" && dialogue.HistoryText == "", "clear excludes stale replies");
+Console.WriteLine("PASS: RPG latest reply, waiting, streaming, expanded history, reminder and clear.");
 UiChecks.Run();
 static void Check(bool condition, string label) { if (!condition) throw new Exception(label); }
 sealed class FakeHandler : HttpMessageHandler

@@ -42,7 +42,6 @@ public partial class AssistantWindow : Window
     public void ApplyScale(double petSize)
     {
         _petSize = petSize;
-        ChatStatus.Visibility = petSize < 200 && !IsExpanded ? Visibility.Collapsed : Visibility.Visible;
         Width = petSize;
         Height = petSize * 1.04 * (IsExpanded ? 1 : 0.5);
     }
@@ -52,16 +51,24 @@ public partial class AssistantWindow : Window
         ExpandButton.Content = expanded ? "⤡" : "⤢";
         ExpandButton.ToolTip = expanded ? "收回至下半身范围" : "展开至桌宠全身范围";
         ApplyScale(_petSize);
+        RenderDialogue(scrollToStart: !expanded);
         LayoutRequested?.Invoke(this, EventArgs.Empty);
     }
     private void Expand_Click(object sender, RoutedEventArgs e) => SetExpanded(!IsExpanded);
     public void PrepareManualOpen()
     {
         ClearNotice();
-        if (ChatOutput.Text.Length == 0) ChatOutput.Text = "今天需要我做什么？\n输入“帮助”查看天气、计时和待办用法。\n";
+        RenderDialogue(scrollToStart: true);
         UpdateTimerStatus();
     }
-    public void ClearNotice() { NoticeBorder.Visibility = Visibility.Collapsed; HeaderTitle.Text = "偶鲸鲸"; HeaderTitle.ToolTip = null; }
+    public void ApplyCharacter(string name)
+    {
+        _dialogue.SpeakerName = name;
+        HeaderTitle.Text = name;
+        Title = $"{name}对话";
+        RenderDialogue();
+    }
+    public void ClearNotice() { NoticeBorder.Visibility = Visibility.Collapsed; HeaderTitle.Text = _dialogue.SpeakerName; HeaderTitle.ToolTip = null; }
     private void HideButton_Click(object sender, RoutedEventArgs e) => HideRequested?.Invoke(this, EventArgs.Empty);
     private void SettingsButton_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
     private void ChatInput_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -106,18 +113,19 @@ public partial class AssistantWindow : Window
         _remaining = TimeSpan.FromMinutes(_isFocusPhase ? _data.FocusMinutes : _data.BreakMinutes);
         SetExpanded(false);
         NoticeText.Text = notice;
-        HeaderTitle.Text = "计时到点";
+        HeaderTitle.Text = _dialogue.SpeakerName;
         HeaderTitle.ToolTip = notice;
         System.Media.SystemSounds.Asterisk.Play();
         AttentionRequested?.Invoke(this, EventArgs.Empty);
-        ChatOutput.AppendText($"提醒：{notice}\n");
-        ChatOutput.ScrollToEnd();
+        _dialogue.AddReply(notice);
+        RenderDialogue(scrollToStart: true);
+
         UpdateTimerStatus();
     }
     private void UpdateTimerStatus()
     {
         if (_chatCancellation != null) return;
         if (_deadline != null) ChatStatus.Text = $"{(_isFocusPhase ? "专注" : "休息")} · {Math.Max(0, (int)Math.Ceiling(_remaining.TotalSeconds)) / 60:00}:{Math.Max(0, (int)Math.Ceiling(_remaining.TotalSeconds)) % 60:00}";
-        else ChatStatus.Text = "Enter 发送 · Shift+Enter 换行";
+        else ChatStatus.Text = string.Empty;
     }
 }
