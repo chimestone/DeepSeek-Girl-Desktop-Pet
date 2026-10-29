@@ -1,5 +1,5 @@
 using System.IO;
-using System.Net.Http;
+
 using NAudio.Dsp;
 using NAudio.Wave;
 
@@ -8,9 +8,8 @@ namespace DeepSeekPet;
 // Analysis is in the playback pipeline, never the microphone or system loopback.
 public sealed class DanceAudio : IDisposable
 {
-    public const string SourcePage = "https://www.dj95.com/mp3/121445.html";
-    public const string TrackName = "朋友的酒 · DJ阿帆 Electro Rmx 2020（试听）";
-    private const string PreviewUrl = "https://dj95.oss-cn-hangzhou.aliyuncs.com/mp4/zwhouse/2020/001/121445_www_Dj95_com.mp4";
+    public const string SourcePage = "https://www.bilibili.com/video/BV1kFar6KE4t";
+    public const string TrackName = "朋友的酒 DJ · B站缓存（3分05秒循环）";
     private AudioFileReader? _reader;
     private WaveOutEvent? _output;
     private SpectrumProvider? _spectrum;
@@ -23,39 +22,13 @@ public sealed class DanceAudio : IDisposable
     public string? PlaybackError { get; private set; }
     public float Volume { get => _output?.Volume ?? .55f; set { if (_output != null) _output.Volume = Math.Clamp(value, 0, 1); } }
 
-    public static async Task<string> GetPreviewAsync(CancellationToken token)
+    public static Task<string> GetTrackAsync(CancellationToken token)
     {
-        // Public low-bitrate preview; no commercial music is embedded in releases.
-        var directory = Path.Combine(PetSettings.SettingsDirectory, "DanceCache");
-        Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, "friends-wine-dj-afan-preview.m4a");
-        if (File.Exists(path) && new FileInfo(path).Length > 1024) return path;
-        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
-            using var response = await http.GetAsync(PreviewUrl, HttpCompletionOption.ResponseHeadersRead, token);
-            response.EnsureSuccessStatusCode();
-            await using (var input = await response.Content.ReadAsStreamAsync(token))
-            await using (var output = File.Create(temp))
-            {
-                var buffer = new byte[81920];
-                long total = 0;
-                int read;
-                while ((read = await input.ReadAsync(buffer, token)) > 0)
-                {
-                    total += read;
-                    if (total > 32 * 1024 * 1024) throw new IOException("试听文件过大，请使用本地音频。");
-                    await output.WriteAsync(buffer.AsMemory(0, read), token);
-                }
-                if (total < 1024) throw new IOException("试听音源暂不可用。");
-            }
-            File.Move(temp, path, true);
-            return path;
-        }
-        finally { if (File.Exists(temp)) File.Delete(temp); }
+        token.ThrowIfCancellationRequested();
+        var path = Path.Combine(AppContext.BaseDirectory, "Assets", "Audio", "friends-wine-bilibili.m4a");
+        if (!File.Exists(path)) throw new FileNotFoundException("缺少本地跳舞音频，请补齐 Assets/Audio/friends-wine-bilibili.m4a。", path);
+        return Task.FromResult(path);
     }
-
     public void Load(string path)
     {
         Dispose();
@@ -63,7 +36,7 @@ public sealed class DanceAudio : IDisposable
         try
         {
             _reader = new AudioFileReader(path);
-            _spectrum = new SpectrumProvider(_reader);
+            _spectrum = new SpectrumProvider(new LoopingProvider(_reader));
             _output = new WaveOutEvent { DesiredLatency = 80, NumberOfBuffers = 2, Volume = .55f };
             _output.Init(_spectrum);
             _output.PlaybackStopped += (_, e) => { if (e.Exception != null) PlaybackError = "音频设备不可用，请重新选曲。"; };
@@ -89,6 +62,28 @@ public sealed class DanceAudio : IDisposable
         _spectrum = null;
     }
 
+    // Wrap at decoded EOF inside the output pipeline, without stopping/reopening the device.
+    public sealed class LoopingProvider(WaveStream source) : ISampleProvider
+    {
+        private readonly ISampleProvider _samples = source.ToSampleProvider();
+        public WaveFormat WaveFormat => _samples.WaveFormat;
+        public int Read(float[] buffer, int offset, int count)
+        {
+            var total = 0;
+            while (total < count)
+            {
+                var read = _samples.Read(buffer, offset + total, count - total);
+                if (read == 0)
+                {
+                    source.Position = 0;
+                    read = _samples.Read(buffer, offset + total, count - total);
+                    if (read == 0) break; // Empty or unreadable source must not spin forever.
+                }
+                total += read;
+            }
+            return total;
+        }
+    }
     public sealed class SpectrumProvider(ISampleProvider source) : ISampleProvider
     {
         // 2048-point Hann FFT (~46 ms at 44.1 kHz). Kick band: 20–150 Hz.

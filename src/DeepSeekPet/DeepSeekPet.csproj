@@ -15,6 +15,9 @@
   <ItemGroup>
     <Resource Include="Assets\Skins\*.png" />
     <Content Include="Assets\deepseek-girl.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Audio\friends-wine-bilibili.m4a"
+             Condition="Exists('Assets\Audio\friends-wine-bilibili.m4a')"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

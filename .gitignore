@@ -7,3 +7,4 @@ art/
 
 *.docx
 .work/
+src/DeepSeekPet/Assets/Audio/*.m4a

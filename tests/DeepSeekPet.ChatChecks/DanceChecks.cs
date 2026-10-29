@@ -42,11 +42,18 @@ static class DanceChecks
         if (index >= 0 && index + 1 < args.Length)
         {
             using var reader = new AudioFileReader(args[index + 1]);
+            Check(Math.Abs(reader.TotalTime.TotalSeconds - 185) < .1, "Bilibili clip is 3:05");
+            reader.CurrentTime = reader.TotalTime - TimeSpan.FromMilliseconds(10);
+            var loop = new DanceAudio.LoopingProvider(reader);
+            var loopBuffer = new float[8192];
+            Check(loop.Read(loopBuffer, 0, loopBuffer.Length) == loopBuffer.Length && reader.CurrentTime.TotalSeconds < 1,
+                "audio wraps at EOF without returning an empty buffer");
+            reader.Position = 0;
             var spectrum = new DanceAudio.SpectrumProvider(reader);
             var samples = new float[8192]; double peak = 0;
             for (var n = 0; n < 200 && spectrum.Read(samples, 0, samples.Length) > 0; n++) peak = Math.Max(peak, spectrum.Bass);
             Check(reader.TotalTime.TotalSeconds > 30 && peak > .05, "downloaded preview decodes and contains bass");
-            Console.WriteLine($"PASS: preview decodes ({reader.TotalTime:mm\\:ss}), bass peak={peak:F2}.");
+            Console.WriteLine($"PASS: Bilibili clip decodes ({reader.TotalTime:mm\\:ss}), seamless buffer wrap, bass peak={peak:F2}.");
             using var playback = new DanceAudio();
             playback.Load(args[index + 1]); playback.Volume = .08f; playback.Toggle();
             Thread.Sleep(250); Check(playback.IsPlaying, "audio device starts");

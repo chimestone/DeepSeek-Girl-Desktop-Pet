@@ -26,10 +26,10 @@ public partial class MainWindow
         _danceLoading = request;
         try
         {
-            var path = await DanceAudio.GetPreviewAsync(request.Token);
+            var path = await DanceAudio.GetTrackAsync(request.Token);
             if (request.IsCancellationRequested || !_isDancing) return;
             _danceAudio.Load(path);
-            // The tempo clock starts again with the music, excluding network loading time.
+            // Start the tempo clock with the local music.
             _danceMotion = new DanceMotion();
             _danceAudio.Toggle();
         }
@@ -40,7 +40,7 @@ public partial class MainWindow
             {
                 StopDance();
                 _danceMenuItem.Header = "跳舞加载失败 · 点击重试";
-                _danceMenuItem.ToolTip = "请检查网络和音频设备后重试。";
+                _danceMenuItem.ToolTip = "请检查本地音频文件和音频设备后重试。";
             }
         }
         finally { if (ReferenceEquals(_danceLoading, request)) _danceLoading = null; }
