@@ -58,6 +58,7 @@ dialogue.Append(pendingReply, "过期回复");
 Check(dialogue.CompactText == "" && dialogue.HistoryText == "", "clear excludes stale replies");
 Console.WriteLine("PASS: RPG latest reply, waiting, streaming, expanded history, reminder and clear.");
 UiChecks.Run();
+DanceChecks.Run();
 static void Check(bool condition, string label) { if (!condition) throw new Exception(label); }
 sealed class FakeHandler : HttpMessageHandler
 {

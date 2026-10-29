@@ -62,6 +62,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             CompositionTarget.Rendering -= OnRendering;
+            StopDance();
             _assistantWindow?.CloseForAppExit();
         };
         MouseLeftButtonDown += OnMouseLeftButtonDown;
@@ -103,6 +104,9 @@ public partial class MainWindow : Window
         var settingsItem = new MenuItem { Header = "设置…" };
         settingsItem.Click += (_, _) => OpenSettings();
 
+        _danceMenuItem = new MenuItem { Header = "跳舞 · 朋友的酒 DJ" };
+        _danceMenuItem.Click += async (_, _) => await OpenDance();
+
         _walkMenuItem = new MenuItem { Header = "自动散步", IsCheckable = true };
         _walkMenuItem.Click += (_, _) =>
         {
@@ -118,6 +122,7 @@ public partial class MainWindow : Window
         exitItem.Click += (_, _) => Close();
 
         menu.Items.Add(assistantItem);
+        menu.Items.Add(_danceMenuItem);
         menu.Items.Add(settingsItem);
         menu.Items.Add(_walkMenuItem);
         menu.Items.Add(resetItem);
@@ -325,12 +330,13 @@ public partial class MainWindow : Window
             UpdateBehavior(now, dt);
         }
 
-        UpdateAnimation(now);
+        if (_isDancing) UpdateDance(dt);
+        else UpdateAnimation(now);
     }
 
     private void UpdateBehavior(double now, double dt)
     {
-        if (!_settings.AutoWalk || (_assistantWindow?.IsVisible ?? false))
+        if (!_settings.AutoWalk || _isDancing || (_assistantWindow?.IsVisible ?? false))
         {
             _isWalking = false;
             return;
@@ -373,6 +379,7 @@ public partial class MainWindow : Window
 
     private void UpdateAnimation(double now)
     {
+        if (_isDancing) return;
         var idleWave = Math.Sin(now * Math.PI * 2 / 2.8);
         var scaleX = 1.0 - idleWave * 0.004;
         var scaleY = 1.0 + idleWave * 0.008;

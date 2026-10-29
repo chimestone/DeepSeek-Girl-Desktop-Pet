@@ -16,4 +16,8 @@
     <Resource Include="Assets\Skins\*.png" />
     <Content Include="Assets\deepseek-girl.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+  </ItemGroup>
 </Project>
